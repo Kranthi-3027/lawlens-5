@@ -4,9 +4,10 @@ import { GoogleIcon, LogoIcon } from './icons';
 
 interface SignInModalProps {
     onSignIn: () => Promise<void>;
+    onGuestSignIn: () => void;
 }
 
-const SignInModal: React.FC<SignInModalProps> = ({ onSignIn }) => {
+const SignInModal: React.FC<SignInModalProps> = ({ onSignIn, onGuestSignIn }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSignInClick = async () => {
@@ -49,6 +50,19 @@ const SignInModal: React.FC<SignInModalProps> = ({ onSignIn }) => {
                             Sign In with Google
                         </>
                     )}
+                </button>
+                <div className="my-4 flex items-center">
+                    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                    <span className="flex-shrink mx-4 text-gray-600 dark:text-gray-400 text-sm">OR</span>
+                    <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                </div>
+
+                <button
+                    onClick={onGuestSignIn}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Continue as Guest
                 </button>
             </div>
         </div>

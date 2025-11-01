@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged, signOut, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithPopup, signInAnonymously } from 'firebase/auth';
 import { auth, provider } from './services/firebase';
+import { addChat, getChats, updateChat, deleteChat } from './services/firestore';
 import type { ChatSession, Message } from './types';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import SignInModal from './components/SignInModal';
+import TermsAndConditionsModal from './components/TermsAndConditionsModal';
 import { runChat } from './services/gemini';
 import { MenuIcon, XIcon, LogoIcon } from './components/icons';
 
@@ -18,46 +20,67 @@ const App: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [isDataLoaded, setIsDataLoaded] = useState(false);
+    const [hasAgreedToTerms, setHasAgreedToTerms] = useState(false);
 
-    const addNewChat = useCallback((isInitialChat = false) => {
-        const newChatId = `chat-${Date.now()}`;
-        const newChat: ChatSession = {
-            id: newChatId,
+    const addNewChat = useCallback(async (userId: string, isInitialChat = false) => {
+        const newChatData: Omit<ChatSession, 'id' | 'createdAt'> = {
             title: 'New Chat',
             messages: [],
         };
+        
+        const newChatId = await addChat(userId, newChatData);
+        
+        const newChat: ChatSession = {
+            id: newChatId,
+            ...newChatData,
+            createdAt: new Date(),
+        };
+
         setChats(prevChats => {
             const newChats = new Map(prevChats);
             newChats.set(newChatId, newChat);
             return newChats;
         });
         setActiveChatId(newChatId);
+
         if (!isInitialChat) {
             setIsSidebarOpen(false);
         }
     }, []);
 
-    useEffect(() => {
-        // Check for redirect result on mount
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result) {
-                    console.log("Redirect sign-in successful:", result.user.email);
-                }
-            })
-            .catch((error) => {
-                console.error("Redirect sign-in error:", error);
-            });
+    const loadChats = useCallback(async (currentUser: User) => {
+        const userChats = await getChats(currentUser.uid);
+        if (userChats.size > 0) {
+            const sortedChats = new Map([...userChats.entries()].sort((a, b) => {
+                const dateA = a[1].createdAt || 0;
+                const dateB = b[1].createdAt || 0;
+                return (dateB as number) - (dateA as number);
+            }));
+            setChats(sortedChats);
+            setActiveChatId(sortedChats.keys().next().value || null);
+        } else {
+            await addNewChat(currentUser.uid, true);
+        }
+        setIsDataLoaded(true);
+    }, [addNewChat]);
 
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
             setIsAuthLoading(false);
-            if (user && chats.size === 0) {
-                addNewChat(true);
+            if (currentUser) {
+                loadChats(currentUser);
+            } else {
+                setChats(new Map());
+                setActiveChatId(null);
+                setIsDataLoaded(false);
+                setHasAgreedToTerms(false);
             }
         });
         return () => unsubscribe();
-    }, [addNewChat, chats.size]);
+    }, [loadChats]);
+
 
     useEffect(() => {
         const root = window.document.documentElement;
@@ -74,8 +97,50 @@ const App: React.FC = () => {
         setIsSidebarOpen(false);
     };
 
+    const handleDeleteChat = async (chatId: string) => {
+        if (!user) return;
+
+        try {
+            await deleteChat(user.uid, chatId);
+            setChats(prevChats => {
+                const newChats = new Map(prevChats);
+                newChats.delete(chatId);
+                return newChats;
+            });
+
+            if (activeChatId === chatId) {
+                const remainingChats = Array.from(chats.keys()).filter(id => id !== chatId);
+                if (remainingChats.length > 0) {
+                    setActiveChatId(remainingChats[0]);
+                } else {
+                    addNewChat(user.uid, true);
+                }
+            }
+        } catch (error) {
+            console.error("Error deleting chat:", error);
+        }
+    };
+
+    const handleRenameChat = async (chatId: string, newTitle: string) => {
+        if (!user) return;
+
+        try {
+            await updateChat(user.uid, chatId, { title: newTitle });
+            setChats(prevChats => {
+                const newChats = new Map(prevChats);
+                const chatToUpdate = newChats.get(chatId);
+                if (chatToUpdate) {
+                    newChats.set(chatId, { ...chatToUpdate, title: newTitle });
+                }
+                return newChats;
+            });
+        } catch (error) {
+            console.error("Error renaming chat:", error);
+        }
+    };
+
     const handleSendMessage = useCallback(async (newMessage: Message) => {
-        if (!activeChatId) return;
+        if (!activeChatId || !user) return;
 
         const currentChat = chats.get(activeChatId);
         if (!currentChat) return;
@@ -83,12 +148,10 @@ const App: React.FC = () => {
         const updatedMessages = [...currentChat.messages, newMessage];
         let updatedChat = { ...currentChat, messages: updatedMessages };
 
-        if (currentChat.messages.length === 0 && newMessage.parts[0]?.text) {
+        const isFirstMessage = currentChat.messages.length === 0;
+        if (isFirstMessage && newMessage.parts[0]?.text) {
              const newTitle = newMessage.parts[0].text.substring(0, 30);
-             updatedChat = { 
-                ...updatedChat, 
-                title: newTitle.length === 30 ? `${newTitle}...` : newTitle 
-            };
+             updatedChat.title = newTitle.length === 30 ? `${newTitle}...` : newTitle;
         }
 
         const newChats = new Map(chats);
@@ -97,86 +160,87 @@ const App: React.FC = () => {
         setIsLoading(true);
 
         try {
+            await updateChat(user.uid, activeChatId, {
+                messages: updatedMessages,
+                ...(isFirstMessage && { title: updatedChat.title })
+            });
+
             const aiResponseText = await runChat(updatedMessages);
             const aiMessage: Message = {
                 role: 'model',
                 parts: [{ text: aiResponseText }],
                 timestamp: Date.now()
             };
+
+            await updateChat(user.uid, activeChatId, {
+                messages: [...updatedMessages, aiMessage]
+            });
             
             setChats(prevChats => {
-                const newChats = new Map(prevChats);
-                const finalChat = newChats.get(activeChatId);
+                const finalChats = new Map(prevChats);
+                const finalChat = finalChats.get(activeChatId);
                 if (finalChat) {
-                    const finalMessages = [...finalChat.messages, aiMessage];
-                    newChats.set(activeChatId, { ...finalChat, messages: finalMessages });
+                    finalChats.set(activeChatId, { 
+                        ...finalChat, 
+                        messages: [...finalChat.messages, aiMessage] 
+                    });
                 }
-                return newChats;
+                return finalChats;
             });
+
         } catch (error) {
-            console.error("Error from Gemini API:", error);
+            console.error("Error handling message:", error);
             const errorMessage: Message = {
                 role: 'model',
                 parts: [{ text: "Sorry, I encountered an error. Please try again." }],
                 timestamp: Date.now()
             };
             setChats(prevChats => {
-                const newChats = new Map(prevChats);
-                const finalChat = newChats.get(activeChatId);
-                if (finalChat) {
-                    const finalMessages = [...finalChat.messages, errorMessage];
-                    newChats.set(activeChatId, { ...finalChat, messages: finalMessages });
+                const newChatsOnError = new Map(prevChats);
+                const chatOnError = newChatsOnError.get(activeChatId);
+                if (chatOnError) {
+                    newChatsOnError.set(activeChatId, {
+                        ...chatOnError,
+                        messages: [...chatOnError.messages, errorMessage]
+                    });
                 }
-                return newChats;
+                return newChatsOnError;
             });
         } finally {
             setIsLoading(false);
         }
-    }, [activeChatId, chats]);
+    }, [activeChatId, chats, user]);
     
     const handleSignIn = async () => {
-        setIsAuthLoading(true);
         try {
-            const result = await signInWithPopup(auth, provider);
-            console.log("Sign-in successful:", result.user.email);
+            await signInWithPopup(auth, provider);
         } catch (error: any) {
-            console.error("Error signing in with Google:", error);
-            console.error("Error code:", error.code);
-            console.error("Error message:", error.message);
-            
-            // If popup is blocked or fails, try redirect method
-            if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-                console.log("Popup failed, trying redirect method...");
-                try {
-                    await signInWithRedirect(auth, provider);
-                    return; // Don't set loading to false, page will redirect
-                } catch (redirectError: any) {
-                    console.error("Redirect sign-in also failed:", redirectError);
-                }
-            }
-            
-            // Show user-friendly error message
-            let errorMessage = "Sign-in failed. ";
-            if (error.code === 'auth/popup-closed-by-user') {
-                errorMessage += "Popup was closed before completing sign in.";
-            } else if (error.code === 'auth/popup-blocked') {
-                errorMessage += "Popup was blocked by your browser. Trying redirect method...";
-            } else if (error.code === 'auth/unauthorized-domain') {
-                errorMessage += "This domain is not authorized. Please add it in Firebase Console.";
-            } else if (error.code === 'auth/operation-not-allowed') {
-                errorMessage += "Google sign-in is not enabled in Firebase Console.";
-            } else {
-                errorMessage += error.message;
-            }
-            alert(errorMessage);
-            setIsAuthLoading(false);
+            console.error("Error signing in with Google:", error.message);
+            alert(`Sign-in failed: ${error.message}`);
+        }
+    };
+
+    const handleGuestSignIn = async () => {
+        try {
+            await signInAnonymously(auth);
+        } catch (error: any) {
+            console.error("Error signing in anonymously:", error.message);
+            alert(`Guest sign-in failed: ${error.message}`);
         }
     };
 
     const handleSignOut = async () => {
         await signOut(auth);
-        setChats(new Map());
-        setActiveChatId(null);
+    };
+    
+    const handleNewChat = () => {
+        if (user) {
+            addNewChat(user.uid);
+        }
+    };
+
+    const handleAgreeToTerms = () => {
+        setHasAgreedToTerms(true);
     };
 
     const activeChat = (activeChatId && chats.get(activeChatId)) || null;
@@ -187,16 +251,26 @@ const App: React.FC = () => {
         </div>
     );
 
+    if (isAuthLoading || (user && !isDataLoaded)) {
+        return renderLoading();
+    }
+
     return (
         <div className="flex h-screen w-screen bg-brand-light-secondary dark:bg-brand-dark text-gray-800 dark:text-gray-200 font-sans">
-            {isAuthLoading ? renderLoading() : !user ? <SignInModal onSignIn={handleSignIn} /> : (
+            {!user ? (
+                <SignInModal onSignIn={handleSignIn} onGuestSignIn={handleGuestSignIn} />
+            ) : !hasAgreedToTerms ? (
+                <TermsAndConditionsModal onAgree={handleAgreeToTerms} />
+            ) : (
                 <>
                     <Sidebar
                         chats={Array.from(chats.values())}
                         activeChatId={activeChatId}
                         user={user}
-                        onNewChat={addNewChat}
+                        onNewChat={handleNewChat}
                         onSelectChat={selectChat}
+                        onDeleteChat={handleDeleteChat}
+                        onRenameChat={handleRenameChat}
                         theme={theme}
                         onToggleTheme={toggleTheme}
                         isOpen={isSidebarOpen}

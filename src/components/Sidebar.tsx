@@ -12,6 +12,8 @@ interface SidebarProps {
     user: User | null;
     onNewChat: () => void;
     onSelectChat: (chatId: string) => void;
+    onDeleteChat: (chatId: string) => void;
+    onRenameChat: (chatId: string, newTitle: string) => void;
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
     isOpen: boolean;
@@ -21,7 +23,8 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ 
     chats, activeChatId, user, onNewChat, onSelectChat, 
-    theme, onToggleTheme, isOpen, setIsOpen, onSignOut 
+    onDeleteChat, onRenameChat, theme, onToggleTheme, 
+    isOpen, setIsOpen, onSignOut 
 }) => {
     return (
         <aside className={`absolute md:relative z-30 h-full bg-brand-light dark:bg-brand-dark-secondary text-white transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 w-64 flex-shrink-0 flex flex-col`}>
@@ -31,6 +34,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     activeChatId={activeChatId}
                     onNewChat={onNewChat}
                     onSelectChat={onSelectChat}
+                    onDeleteChat={onDeleteChat}
+                    onRenameChat={onRenameChat}
                 />
             </div>
 

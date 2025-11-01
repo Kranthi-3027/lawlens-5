@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { Message } from '../types';
 import { fileToGenerativePart, isSupportedFile } from '../utils/file';
 import { PlusIcon, SendIcon, PaperclipIcon, XIcon, MicrophoneIcon, CameraIcon } from './icons';
+import CameraComponent from './CameraComponent';
 
 interface SpeechRecognition extends EventTarget {
     continuous: boolean;
@@ -32,6 +33,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     const [text, setText] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [isRecording, setIsRecording] = useState(false);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [micError, setMicError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -110,12 +112,26 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
         if (selectedFile && isSupportedFile(selectedFile)) {
             setFile(selectedFile);
         } else if (selectedFile) {
-            alert('Unsupported file type. Please upload images (JPG, PNG) or Word documents (DOCX).');
+            alert('Unsupported file type. Please upload images (JPG, PNG), Word documents (DOCX), or PDFs.');
         }
     };
 
     const triggerFileIput = () => {
         fileInputRef.current?.click();
+    };
+
+    const handleCapture = (image: string) => {
+        const byteString = atob(image.split(',')[1]);
+        const mimeString = image.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeString });
+        const capturedFile = new File([blob], "capture.jpg", { type: mimeString });
+        setFile(capturedFile);
+        setIsCameraOpen(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -147,6 +163,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
 
     return (
         <div className="p-4 md:p-6 bg-white dark:bg-brand-dark-secondary border-t border-gray-200 dark:border-white/10">
+            {isCameraOpen && <CameraComponent onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}
             <form onSubmit={handleSubmit} className="relative">
                 {file && (
                     <div className="absolute bottom-full left-0 mb-2 w-full">
@@ -172,7 +189,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
                     <button type="button" onClick={triggerFileIput} className="p-2 text-gray-500 hover:text-brand-accent dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading || isRecording}>
                         <PlusIcon />
                     </button>
-                    <button type="button" onClick={triggerFileIput} className="p-2 text-gray-500 hover:text-brand-accent dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading || isRecording}>
+                    <button type="button" onClick={() => setIsCameraOpen(true)} className="p-2 text-gray-500 hover:text-brand-accent dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading || isRecording}>
                         <CameraIcon />
                     </button>
                     <input
@@ -180,7 +197,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
                         ref={fileInputRef}
                         onChange={handleFileChange}
                         className="hidden"
-                        accept="image/png, image/jpeg, image/webp, application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        accept="image/png, image/jpeg, image/webp, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/pdf"
                     />
                     <input
                         type="text"
