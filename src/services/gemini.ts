@@ -61,7 +61,7 @@ export const runChat = async (history: Message[]): Promise<string> => {
     try {
         const ai = getAI();
         const model = ai.getGenerativeModel({ 
-            model: 'gemini-1.5-flash-latest', 
+            model: 'gemini-2.5-flash-lite', 
             systemInstruction: SYSTEM_INSTRUCTION 
         });
         

@@ -13,8 +13,8 @@ An AI-powered legal document analysis tool using Google's Gemini AI.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/Kranthi-3027/lawlens-5.git
-cd lawlens-5
+git clone https://github.com/Kranthi-3027/lawlens--6.git
+cd lawlens--6
 ```
 
 2. Install dependencies:
