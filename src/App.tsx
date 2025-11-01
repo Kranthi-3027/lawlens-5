@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged, signOut, signInWithPopup } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth, provider } from './services/firebase';
 import type { ChatSession, Message } from './types';
 import Sidebar from './components/Sidebar';
@@ -38,6 +38,17 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        // Check for redirect result on mount
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    console.log("Redirect sign-in successful:", result.user.email);
+                }
+            })
+            .catch((error) => {
+                console.error("Redirect sign-in error:", error);
+            });
+
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             setUser(user);
             setIsAuthLoading(false);
@@ -126,9 +137,38 @@ const App: React.FC = () => {
     const handleSignIn = async () => {
         setIsAuthLoading(true);
         try {
-            await signInWithPopup(auth, provider);
-        } catch (error) {
-            console.error("Error signing in with Google: ", error);
+            const result = await signInWithPopup(auth, provider);
+            console.log("Sign-in successful:", result.user.email);
+        } catch (error: any) {
+            console.error("Error signing in with Google:", error);
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            
+            // If popup is blocked or fails, try redirect method
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+                console.log("Popup failed, trying redirect method...");
+                try {
+                    await signInWithRedirect(auth, provider);
+                    return; // Don't set loading to false, page will redirect
+                } catch (redirectError: any) {
+                    console.error("Redirect sign-in also failed:", redirectError);
+                }
+            }
+            
+            // Show user-friendly error message
+            let errorMessage = "Sign-in failed. ";
+            if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage += "Popup was closed before completing sign in.";
+            } else if (error.code === 'auth/popup-blocked') {
+                errorMessage += "Popup was blocked by your browser. Trying redirect method...";
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage += "This domain is not authorized. Please add it in Firebase Console.";
+            } else if (error.code === 'auth/operation-not-allowed') {
+                errorMessage += "Google sign-in is not enabled in Firebase Console.";
+            } else {
+                errorMessage += error.message;
+            }
+            alert(errorMessage);
             setIsAuthLoading(false);
         }
     };
