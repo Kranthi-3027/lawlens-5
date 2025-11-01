@@ -6,7 +6,7 @@ If Google Sign-In is not working, follow these steps:
 
 ### Enable Google Sign-In Provider
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `lawlens-1d554`
+2. Select your project: `lawlens-48357717-1993a`
 3. Go to **Authentication** → **Sign-in method**
 4. Click on **Google** provider
 5. Make sure it's **Enabled**
