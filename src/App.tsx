@@ -70,6 +70,8 @@ const App: React.FC = () => {
             setUser(currentUser);
             setIsAuthLoading(false);
             if (currentUser) {
+                const hasAgreed = localStorage.getItem(`terms_agreed_${currentUser.uid}`) === 'true';
+                setHasAgreedToTerms(hasAgreed);
                 loadChats(currentUser);
             } else {
                 setChats(new Map());
@@ -240,6 +242,9 @@ const App: React.FC = () => {
     };
 
     const handleAgreeToTerms = () => {
+        if (user) {
+            localStorage.setItem(`terms_agreed_${user.uid}`, 'true');
+        }
         setHasAgreedToTerms(true);
     };
 

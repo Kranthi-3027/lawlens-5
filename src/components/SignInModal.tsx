@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { GoogleIcon, LogoIcon } from './icons';
 
 interface SignInModalProps {
@@ -51,6 +52,11 @@ const SignInModal: React.FC<SignInModalProps> = ({ onSignIn, onGuestSignIn }) =>
                         </>
                     )}
                 </button>
+
+                <Link to="/phone-auth" className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mt-4">
+                    Sign In with Phone
+                </Link>
+
                 <div className="my-4 flex items-center">
                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
                     <span className="flex-shrink mx-4 text-gray-600 dark:text-gray-400 text-sm">OR</span>

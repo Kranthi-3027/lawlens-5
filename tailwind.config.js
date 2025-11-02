@@ -8,11 +8,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        'brand-dark': '#0f172a',
-        'brand-dark-secondary': '#1e293b',
-        'brand-light': '#f8fafc',
+        'brand-dark': '#1e293b',
+        'brand-dark-secondary': '#334155',
+        'brand-light': '#ffffff',
         'brand-light-secondary': '#f1f5f9',
-        'brand-accent': '#3b82f6',
+        'brand-accent': '#ec4899',
+        'brand-primary': '#14b8a6',
+        'brand-secondary': '#a855f7',
       },
     },
   },
