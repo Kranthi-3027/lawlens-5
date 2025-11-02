@@ -6,7 +6,7 @@ If Google Sign-In is not working, follow these steps:
 
 ### Enable Google Sign-In Provider
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `lawlens-48357717-1993a`
+2. Select your project: `lawlens-6-61085567-b2538`
 3. Go to **Authentication** → **Sign-in method**
 4. Click on **Google** provider
 5. Make sure it's **Enabled**
@@ -23,108 +23,107 @@ If Google Sign-In is not working, follow these steps:
 **Important:** Firebase automatically adds `localhost` and your Firebase hosting domain, but you must manually add Vercel/Netlify domains!
 
 ## 2. Browser Issues
+# Google Sign-In Troubleshooting Guide
 
-### Allow Popups
-- Make sure your browser allows popups for your site
-- Check for a blocked popup icon in the address bar
-- The app now has fallback redirect sign-in if popups are blocked
+If Google Sign-In is not working, follow these steps to identify and fix the issue.
 
-### Clear Cache
-- Clear browser cache and cookies
-- Try in an incognito/private window
-- Try a different browser
+## 1 — Check Firebase Console settings
 
-### Check Browser Console
-Open browser DevTools (F12) and check the Console tab for errors:
-- Look for `auth/` error codes
-- Common errors explained below
+### Enable the Google provider
+1. Open the Firebase Console: https://console.firebase.google.com/
+2. Select the correct project (verify the project ID in your app's `src/services/firebase.ts`).
+3. Go to **Authentication → Sign-in method**.
+4. Click **Google** and make sure it's **Enabled**. Add a support email if required.
 
-## 3. Common Firebase Auth Error Codes
+### Add authorized domains
+1. In Firebase Console go to **Authentication → Settings → Authorized domains**.
+2. Add the domains you use, for example:
+   - `localhost` (for local dev)
+   - `your-app.vercel.app` (Vercel)
+   - `your-app.netlify.app` (Netlify)
+   - Any custom domains you host on
 
-| Error Code | Meaning | Solution |
-|------------|---------|----------|
-| `auth/popup-blocked` | Browser blocked the popup | Allow popups or use redirect method |
-| `auth/popup-closed-by-user` | User closed popup before completing | Try again |
-| `auth/unauthorized-domain` | Domain not authorized in Firebase | Add domain in Firebase Console |
-| `auth/operation-not-allowed` | Google sign-in not enabled | Enable in Firebase Console |
-| `auth/network-request-failed` | Network issue | Check internet connection |
-| `auth/internal-error` | Firebase configuration issue | Check Firebase config values |
+Note: Firebase typically adds `localhost` automatically, but you must manually add hosted domains (Vercel/Netlify/custom).
 
-## 4. Local Development
+## 2 — Browser issues
 
-For local development, make sure:
-```bash
-# Run the dev server
+### Allow popups
+- Ensure your browser allows popups for the site (popup-based OAuth is the default sign-in flow).
+- If popups are blocked, the app will fall back to redirect sign-in in many cases.
+
+### Clear cache / try other browsers
+- Clear browser cache and cookies or use an Incognito/Private window.
+- Try a different browser to rule out browser-specific extensions or settings.
+
+### Inspect DevTools console
+- Open DevTools (F12) and look for `auth/` error codes — they give precise causes.
+
+## 3 — Common Firebase Auth error codes
+
+| Error code | Meaning | Fix |
+|---|---|---|
+| `auth/popup-blocked` | Browser blocked the popup | Allow popups or use redirect flow |
+| `auth/popup-closed-by-user` | User closed popup | Try again |
+| `auth/unauthorized-domain` | Domain not in Firebase Authorized domains | Add domain in Firebase Console |
+| `auth/operation-not-allowed` | Google provider disabled | Enable Google in Firebase Console |
+| `auth/network-request-failed` | Network/connectivity issue | Check internet / retry |
+| `auth/internal-error` | SDK/config issue | Check Firebase config values |
+
+## 4 — Local development checklist
+```powershell
+# Run dev server
 npm run dev
-
-# It should run on http://localhost:5173
-# Firebase should automatically allow localhost
+# App should run on http://localhost:5173
 ```
 
-## 5. Production Deployment
+Make sure `localhost` is present in Firebase Authorized domains and that `src/services/firebase.ts` is using the expected environment variables (VITE_FIREBASE_*).
 
-### For Vercel:
-1. Deploy your app
-2. Get your deployment URL (e.g., `lawlens-5.vercel.app`)
-3. Add this URL to Firebase **Authorized domains**
-4. Wait 1-2 minutes for Firebase to update
-5. Test sign-in again
+## 5 — Production deployment notes
 
-### For Netlify:
-1. Deploy your app
-2. Get your deployment URL (e.g., `lawlens-5.netlify.app`)
-3. Add this URL to Firebase **Authorized domains**
-4. Wait 1-2 minutes for Firebase to update
-5. Test sign-in again
+For any deployed URL (Vercel, Netlify, etc.):
+1. Deploy the app.
+2. Copy the deployment URL (e.g., `lawlens-5.vercel.app`).
+3. Add that URL to Firebase Console → Authentication → Authorized domains.
+4. Wait ~1–2 minutes for Firebase to refresh and then test sign-in again.
 
-## 6. Debugging Steps
+## 6 — Debugging steps
+1. Open DevTools → Console and Network tabs.
+2. Try the sign-in flow and note any console errors (copy error code and message).
+3. Inspect network requests to `google` or `firebase` for failed responses.
+4. Cross-check the Firebase config in `src/services/firebase.ts` with the values in Firebase Console.
 
-1. **Open browser console** (F12)
-2. **Try to sign in**
-3. **Check console logs** for:
-   - "Error code: ..." 
-   - "Error message: ..."
-4. **Match error code** with table above
-5. **Follow the solution**
+Example snippet (how the app should read env vars in `src/services/firebase.ts`):
+```ts
+export const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+```
 
-## 7. Test the Sign-In Flow
+## 7 — Sign-in flow behavior
+- The app attempts popup sign-in first.
+- If the popup is blocked or unavailable, it falls back to redirect sign-in.
+- The UI surfaces friendly error messages; detailed errors appear in the console.
 
-The app now has better error handling:
-- Tries popup sign-in first
-- Falls back to redirect if popup is blocked
-- Shows user-friendly error messages
-- Logs detailed errors to console for debugging
+## 8 — If it's still not working
+1. Copy the exact error code and message from DevTools Console.
+2. Verify the `VITE_FIREBASE_*` values in your environment match the Firebase Console (API key, authDomain, projectId).
+3. Check Network tab for failed requests and read the response body for clues.
 
-## 8. Still Not Working?
-
-If you've tried everything above and it still doesn't work:
-
-1. **Share the error from console:**
-   - Open F12 DevTools
-   - Go to Console tab
-   - Copy the error message and code
-   
-2. **Check Firebase project settings:**
-   - Verify the `firebaseConfig` in `src/services/firebase.ts` matches your Firebase Console
-   - Ensure API key, authDomain, and projectId are correct
-
-3. **Check network requests:**
-   - In DevTools, go to Network tab
-   - Filter by "google" or "firebase"
-   - Look for failed requests (red)
-   - Check the response for error details
-
-## Quick Checklist
-
+## Quick checklist
 - [ ] Google sign-in enabled in Firebase Console
-- [ ] Deployed domain added to Authorized domains in Firebase
-- [ ] Browser allows popups for your site
-- [ ] No console errors in browser DevTools
-- [ ] Firebase config in code matches Firebase Console
-- [ ] Internet connection is working
-- [ ] Tried in incognito/private window
-- [ ] Cleared browser cache
+- [ ] Deployed domain added to Firebase Authorized domains
+- [ ] Browser allows popups or fallback redirect is working
+- [ ] No auth-related console errors
+- [ ] `src/services/firebase.ts` reads correct env vars
+- [ ] Tested in Incognito/private window
 
 ---
 
-**Need more help?** Check the browser console for specific error codes and refer to the error table above.
+If you still see an error, paste the exact console error code/message here and I will walk you through the fix.
+
